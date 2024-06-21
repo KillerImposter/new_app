@@ -95,6 +95,7 @@ function App(): React.JSX.Element {
       ]);
       console.log('READ_CALL_LOG: ' + permissionStatus['android.permission.READ_CALL_LOG']);
       console.log('READ_CONTACTS: ' + permissionStatus['android.permission.READ_CONTACTS']);
+      console.log('READ_PHONE_STATE: ' + permissionStatus['android.permission.READ_PHONE_STATE']);
     }
     catch (err) {
       console.log(err);
@@ -111,18 +112,18 @@ function App(): React.JSX.Element {
           alertTitle: 'Permissions required',
           alertDescription: 'This application needs to access your phone accounts',
           cancelButton: 'Cancel',
-          additionalPermissions: [PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE],
+          additionalPermissions: [],
           okButton: 'ok',
         },
       })
         .then(async() => {
           RNCallKeep.setAvailable(true);  // You can now start receiving calls
           console.log('RNCallkeep setup successfully');
-          const permissionStatus = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE)
-          if(permissionStatus)
-             console.log('READ_PHONE_STATE: granted');
-          else
-            console.log('READ_PHONE_STATE: not granted');
+          // const permissionStatus = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE)
+          // if(permissionStatus)
+          //   console.log('READ_PHONE_STATE: granted');
+          // else
+          //   console.log('READ_PHONE_STATE: not granted');
         })
         .catch((err) => console.log(`RNCallKeep setup error: ${err}`));
     }
