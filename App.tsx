@@ -1,89 +1,40 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- */
-
-import React, { useState, useEffect } from 'react';
-import type { PropsWithChildren } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  Alert,
-  Linking,
   PermissionsAndroid,
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
   StyleSheet,
   Text,
-  useColorScheme,
+  TouchableHighlight,
   View,
 } from 'react-native';
-
-import {
-  Colors,
-  DebugInstructions,
-  Header,
-  LearnMoreLinks,
-  ReloadInstructions,
-} from 'react-native/Libraries/NewAppScreen';
-
+import CallDetectorManager from 'react-native-call-detection';
 import Contacts, { Contact } from 'react-native-contacts';
-import RNCallKeep from 'react-native-callkeep';
 
-type SectionProps = PropsWithChildren<{
-  title: string;
-}>;
-
-function Section({ children, title }: SectionProps): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
-  return (
-    <View style={styles.sectionContainer}>
-      <Text
-        style={[
-          styles.sectionTitle,
-          {
-            color: isDarkMode ? Colors.white : Colors.black,
-          },
-        ]}>
-        {title}
-      </Text>
-      <Text
-        style={[
-          styles.sectionDescription,
-          {
-            color: isDarkMode ? Colors.light : Colors.dark,
-          },
-        ]}>
-        {children}
-      </Text>
-    </View>
-  );
-}
-
-function App(): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
-  const backgroundStyle = {
-    backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
-  };
-
+const App = () => {
+  const [featureOn, setFeatureOn] = useState(false);
+  const [incoming, setIncoming] = useState(false);
+  const [belongsToContacts, setBelongsToContacts] = useState(false);
+  const [number, setNumber] = useState(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
-
   useEffect(() => {
-    askPermission()
-      .then(() => {
-        readContacts().then(() => {
-          setupCallKeep();
-        })
-      });
+    const setupPermissions = async () => {
+      await askPermission();
+      await readContacts();
+    };
+    setupPermissions();
   }, []);
-
-  async function readContacts() {
-    PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.READ_CONTACTS).then(async () => {
-      const contactList = await Contacts.getAllWithoutPhotos();
-      setContacts(contactList);
+  
+  useEffect(() => {
+    contacts.forEach(contact => {
+      console.log(`${contact.displayName}: `);
+      contact.phoneNumbers.forEach((numberDetails) => { 
+        numberDetails.number = numberDetails.number.replaceAll("-","");
+        numberDetails.number = numberDetails.number.replaceAll(" ","");
+        numberDetails.number = numberDetails.number.replaceAll("(","");
+        numberDetails.number = numberDetails.number.replaceAll(")","");
+        console.log(numberDetails.number);
+       });
     });
-  }
+  }, [contacts]);
 
   async function askPermission() {
     try {
@@ -102,73 +53,99 @@ function App(): React.JSX.Element {
     }
   }
 
-  async function setupCallKeep() {
-    try {
-      RNCallKeep.setup({
-        ios: {
-          appName: 'CallKeepDemo',
-        },
-        android: {
-          alertTitle: 'Permissions required',
-          alertDescription: 'This application needs to access your phone accounts',
-          cancelButton: 'Cancel',
-          additionalPermissions: [],
-          okButton: 'ok',
-        },
-      })
-        .then(async() => {
-          RNCallKeep.setAvailable(true);  // You can now start receiving calls
-          console.log('RNCallkeep setup successfully');
-          // const permissionStatus = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE)
-          // if(permissionStatus)
-          //   console.log('READ_PHONE_STATE: granted');
-          // else
-          //   console.log('READ_PHONE_STATE: not granted');
-        })
-        .catch((err) => console.log(`RNCallKeep setup error: ${err}`));
-    }
-    catch (err) {
-      console.log('initializeCallKeep error:', err)
-    }
+  async function readContacts() {
+    PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.READ_CONTACTS).then(async () => {
+      const contactList = await Contacts.getAllWithoutPhotos();
+      setContacts(contactList);
+    });
   }
 
-  // Code to log the contacts
-  // useEffect(() => {
-  //   contacts.forEach(contact => {
-  //     console.log(`${contact.displayName}: `);
-  //     contact.phoneNumbers.forEach((Details) => { console.log(Details.number) });
-  //   });
-  // }, [contacts]);
-
-  useEffect(() => {
-    RNCallKeep.addEventListener('didReceiveStartCallAction', () => console.log('Incoming call'));
-    RNCallKeep.addEventListener('answerCall', () => console.log('Answered call'));
-  }, []);
+  function startDetection() {
+    setFeatureOn(true);
+    this.callDetector = new CallDetectorManager(
+      (event, number) => {
+        console.log(event, number);
+        if (event === 'Disconnected') {
+          setIncoming(false);
+          setBelongsToContacts(false);
+          setNumber(null);
+        } else if (event === 'Incoming') {
+          setIncoming(true);
+          setNumber(number);
+          contacts.forEach(contact => {
+            contact.phoneNumbers.forEach((numberDetails) => {
+              if(numberDetails.number === number)
+              {
+                console.log(numberDetails.number, `belongs to contacts`);
+                setBelongsToContacts(true);
+              }
+            });
+          });
+        } else if (event === 'Offhook') {
+          setIncoming(true);
+          setNumber(number);
+        } else if (event === 'Missed') {
+          setIncoming(false);
+          setBelongsToContacts(false);
+          setNumber(null);
+        }
+      },
+      true, // if you want to read the phone number of the incoming call [ANDROID], otherwise false
+      () => { }, // callback if your permission got denied [ANDROID] [only if you want to read incoming number] default: console.error
+      {
+        title: 'Phone State Permission',
+        message:
+          'This app needs access to your phone state in order to react and/or to adapt to incoming calls.',
+      }, // a custom permission request message to explain to your user, why you need the permission [recommended] - this is the default one
+    );
+  };
+  function stopDetection() {
+    this.callDetector && this.callDetector.dispose();
+    setFeatureOn(false);
+    setIncoming(false);
+  };
 
   return (
-    <SafeAreaView style={backgroundStyle}>
-      <Section title='Hi'></Section>
-    </SafeAreaView>
+    <View style={styles.body}>
+      <Text style={{ color: 'black', fontSize: 26, fontWeight: '700' }}>
+        Call Detection
+      </Text>
+      <Text style={[styles.text, { color: 'black' }]}>
+        Should the detection be on?
+      </Text>
+      <TouchableHighlight
+        style={{ borderRadius: 75 }}
+        onPress={featureOn ? stopDetection : startDetection}>
+        <View
+          style={{
+            width: 200,
+            height: 200,
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: featureOn ? 'green' : 'red',
+            borderRadius: 75,
+          }}>
+          <Text style={styles.text}>{featureOn ? `Warmcall ON` : `Warmcall OFF`} </Text>
+        </View>
+      </TouchableHighlight>
+    </View>
   );
-}
-
-const styles = StyleSheet.create({
-  sectionContainer: {
-    marginTop: 32,
-    paddingHorizontal: 24,
-  },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-  },
-  sectionDescription: {
-    marginTop: 8,
-    fontSize: 18,
-    fontWeight: '400',
-  },
-  highlight: {
-    fontWeight: '700',
-  },
-});
+};
 
 export default App;
+
+const styles = StyleSheet.create({
+  body: {
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    flex: 1,
+  },
+  text: {
+    padding: 20,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  button: {},
+});
