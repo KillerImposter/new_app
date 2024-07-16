@@ -11,10 +11,10 @@ import Contacts, { Contact } from 'react-native-contacts';
 import BackgroundService from 'react-native-background-actions';
 
 const App = () => {
-  const [featureOn, setFeatureOn] = useState(false);
+  const [callDetectionOn, setCallDetectionOn] = useState(false);
   const [incoming, setIncoming] = useState(false);
   const [belongsToContacts, setBelongsToContacts] = useState(false);
-  const [number, setNumber] = useState(null);
+  const [number, setIncomingCallNumber] = useState(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
 
   useEffect(() => {
@@ -27,10 +27,10 @@ const App = () => {
 
   useEffect(() => {
     contacts.forEach(contact => {
-      // console.log(`${contact.displayName}: `);
+      console.log(`${contact.displayName}: `);
       contact.phoneNumbers.forEach((numberDetails) => {
         numberDetails.number = numberDetails.number.replace(/[- )(]/g, '');
-        // console.log(numberDetails.number);
+        console.log(numberDetails.number);
       });
     });
   }, [contacts]);
@@ -57,6 +57,7 @@ const App = () => {
     }
   }
 
+  // Helper function for startService()
   async function startBackgeoundService (taskDataArguments)
   {
     await new Promise((resolve) => {
@@ -64,18 +65,19 @@ const App = () => {
     });
   };
 
+  // Start detecting calls
   async function startDetection() {
-    setFeatureOn(true);
+    setCallDetectionOn(true);
     this.callDetector = new CallDetectorManager(
       (event, number) => {
         console.log(event, number);
         if (event === 'Disconnected') {
           setIncoming(false);
           setBelongsToContacts(false);
-          setNumber(null);
+          setIncomingCallNumber(null);
         } else if (event === 'Incoming') {
           setIncoming(true);
-          setNumber(number);
+          setIncomingCallNumber(number);
           contacts.forEach(contact => {
             contact.phoneNumbers.forEach((numberDetails) => {
               if (numberDetails.number === number) {
@@ -84,13 +86,13 @@ const App = () => {
               }
             });
           });
-        } else if (event === 'Offhook') {
+        } else if (event === 'Offhook') { // Used for debugging only
           setIncoming(true);
-          setNumber(number);
+          setIncomingCallNumber(number);
         } else if (event === 'Missed') {
           setIncoming(false);
           setBelongsToContacts(false);
-          setNumber(null);
+          setIncomingCallNumber(null);
         }
       },
       true,
@@ -102,12 +104,14 @@ const App = () => {
     );
   };
 
+  // Stop ca;; detection 
   function stopDetection() {
     this.callDetector && this.callDetector.dispose();
-    setFeatureOn(false);
+    setCallDetectionOn(false);
     setIncoming(false);
   };
 
+  // Start background service 
   async function startService() {
     const options = {
       taskName: 'My warmcall app',
@@ -119,7 +123,7 @@ const App = () => {
       },
       color: '#ff00ff',
       parameters: {
-        delay: 5000,
+        delay: 5000,    // 5s delay
       },
     };
 
@@ -127,6 +131,7 @@ const App = () => {
     await BackgroundService.updateNotification({ taskDesc: 'New Example description' });
   };
 
+  // Stop background service
   async function stopService() {
     await BackgroundService.stop();
     stopDetection();
@@ -142,17 +147,17 @@ const App = () => {
       </Text>
       <TouchableHighlight
         style={{ borderRadius: 75 }}
-        onPress={featureOn ? stopService : startService}>
+        onPress={callDetectionOn ? stopService : startService}>
         <View
           style={{
             width: 200,
             height: 200,
             justifyContent: 'center',
             alignItems: 'center',
-            backgroundColor: featureOn ? 'green' : 'red',
+            backgroundColor: callDetectionOn ? 'green' : 'red',
             borderRadius: 75,
           }}>
-          <Text style={styles.text}>{featureOn ? `Warmcall ON` : `Warmcall OFF`} </Text>
+          <Text style={styles.text}>{callDetectionOn ? `Warmcall ON` : `Warmcall OFF`} </Text>
         </View>
       </TouchableHighlight>
     </View>
